@@ -66,6 +66,32 @@ def get_best_words(scores_dict):
 
     return scored_words[0:num_words]
 
+# Returns outcome (e.g. "g-y--") given a known solution and played word.
+def evaluate_played_word(played_word, solution_word):
+
+    # First, identify any green letters.
+    outcome = ['g' if played_word[i] == solution_word[i] else '-' for i in range(5)]
+
+    remaining_indices = [i for (i, c) in enumerate(outcome) if c == '-']
+
+    # No more 'char's should be yellow/green than are present in solution.
+    # This list contains remaining characters from solution that can be coloured yellow in outcome.
+    uncoloured_chars = [solution_word[i] for i in remaining_indices]
+
+    # Next, iterate remaining characters and determine if they should be yellow.
+    for i in remaining_indices:
+        if played_word[i] in uncoloured_chars:
+            # Char in solution, and can still place a yellow for this char.
+            outcome[i] = 'y'
+            uncoloured_chars.remove(played_word[i])
+
+        else:
+            # Either char is not in solution, or we have already placed a yellow/green for every instance in solution.
+            outcome[i] = '-'
+
+    return ''.join(outcome)
+
+
 
 # Plays through game of Wordle, scoring words with letter_counts dict.
 def play_game(letter_counts):
