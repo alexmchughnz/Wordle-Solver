@@ -121,8 +121,10 @@ def play_game(letter_counts, strategy={}, solution_word=None):
 
     filters = []
     
+    round = 0
     game_won = None  # state = None if game still in progress.
-    for round in range(1, num_rounds+1):
+    while game_won is None:
+        round += 1
         print(f"\n{'-'*10}[{round}/{num_rounds}]{'-'*10}")
 
         # Suggest best words for this round, applying strategy if present.
@@ -133,21 +135,27 @@ def play_game(letter_counts, strategy={}, solution_word=None):
         best_words = get_best_words(scores_dict)
 
         # Win / Lose conditions.
-        if len(best_words) == 1: 
+        if len(best_words) == 1:  # Auto-win if one valid word remains.
             game_won = True
-            played_words.append(best_words[0])
-        elif len(best_words) == 0:
+            [final_word] = best_words
+            played_words.append(final_word)
+        elif len(best_words) == 0 or round > num_rounds:
             game_won = False
 
         if game_won is None:  # Game still in progress!
-
             # Retrieve played word (typed, or number from previous best words list).
             played_word = ''
 
-            def isvalid(w): return (w in all_words) or (
-                w.isnumeric() and int(w) <= len(best_words))
-            while not isvalid(played_word):
-                played_word = input("What word was played?\t")
+            if 'choose_word' in strategy:
+                # Pre-defined pick.
+                played_word = str(strategy['choose_word'])
+            else:
+                # User input pick.
+                def isvalid(w): return (w in all_words) or (
+                    w.isnumeric() and int(w) <= len(best_words))
+                while not isvalid(played_word):
+                    played_word = input("What word was played?\t")
+
 
             # Handle numerical selection.
             if played_word.isnumeric():
@@ -157,57 +165,60 @@ def play_game(letter_counts, strategy={}, solution_word=None):
             
             played_words.append(played_word)
 
-            # Retrieve outcome of played word.
-            outcome = ''
-            if solution_word: 
-                outcome = evaluate_played_word(played_word, solution_word)
-                print("Result:\t" + outcome)
+            # Evaluate played word
+            if played_word == solution_word:
+                #  Win game immediately if guess is correct.
+                game_won = True
             else:
-                def isvalid(w): return len(w) == 5 and all(
-                    [c.lower() in "gy-" for c in w])
+                outcome = ''
+                if solution_word: 
+                    outcome = evaluate_played_word(played_word, solution_word)
+                    print("Result:\t" + outcome)
+                else:
+                    def isvalid(w): return len(w) == 5 and all(
+                        [c.lower() in "gy-" for c in w])
 
-                while not isvalid(outcome):
-                    outcome = input(
-                        "What was the outcome? ('g' = green, 'y' = yellow, '-' = none)\t")
+                    while not isvalid(outcome):
+                        outcome = input(
+                            "What was the outcome? ('g' = green, 'y' = yellow, '-' = none)\t")
 
-            # Parse outcome and create filters for next round.
-            filters = []
-            for (i, char) in enumerate(outcome):
-                match char.lower():
-                    case 'g':  # Green
-                        def new_filter(w, p=played_word, i=i):
-                            return w[i] == p[i]
+                # Parse outcome and create filters for next round.
+                filters = []
+                for (i, char) in enumerate(outcome):
+                    match char.lower():
+                        case 'g':  # Green
+                            def new_filter(w, p=played_word, i=i):
+                                return w[i] == p[i]
 
-                    case 'y':  # Yellow
-                        def new_filter(w, p=played_word, i=i):
-                            return p[i] in w and w[i] != p[i]
+                        case 'y':  # Yellow
+                            def new_filter(w, p=played_word, i=i):
+                                return p[i] in w and w[i] != p[i]
 
-                    case '-':  # None
-                        def new_filter(w, p=played_word, i=i):
-                            if p.count(p[i]) == 1:
-                                # Single occurence of char in played word - char not in word anywhere.
-                                return p[i] not in w
-                            else:
-                                char_indices = [
-                                    i for (i, c) in enumerate(p) if p[i] == c]
-                                char_outcomes = [outcome[i]
-                                                 for i in char_indices]
-
-                                # If the duplicate letter is always 'none', it is not present anywhere in the word.
-                                if all([c == '-' for c in char_outcomes]):
+                        case '-':  # None
+                            def new_filter(w, p=played_word, i=i):
+                                if p.count(p[i]) == 1:
+                                    # Single occurence of char in played word - char not in word anywhere.
                                     return p[i] not in w
-
-                                # If the duplicate letter is not always 'none', we know is this letter is not at this location (but green or yellow elsewhere).
                                 else:
-                                    return w[i] != p[i]
+                                    char_indices = [i for (i, c) in enumerate(p) if p[i] == c]
+                                    char_outcomes = [outcome[i] for i in char_indices]
 
-                filters.append(new_filter)
+                                    # If the duplicate letter is always 'none', it is not present anywhere in the word.
+                                    if all([c == '-' for c in char_outcomes]):
+                                        return p[i] not in w
 
-            remaining_words = filter_word_list(filters, remaining_words)
+                                    # If the duplicate letter is not always 'none', we know is this letter is not at this location (but green or yellow elsewhere).
+                                    else:
+                                        return w[i] != p[i]
 
-        else:  # Game over!
+                    filters.append(new_filter)
+
+                remaining_words = filter_word_list(filters, remaining_words)
+
+        if game_won is not None:  # Game over!
             if game_won:
                 print("You've wordled it!")
             else:
                 print("You've completely wordled it up. Try again.")
             return (round, played_words, game_won)
+
