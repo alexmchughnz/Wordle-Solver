@@ -1,7 +1,6 @@
 import string
 import csv
 
-CHEAT = True  # If True, will only suggest known solution words.
 
 SOLUTION_FILE = "solutions.csv"
 DICTIONARY_FILE = "dictionary.csv"
@@ -12,8 +11,16 @@ DICTIONARY_FILE = "dictionary.csv"
 def has_no_doubles(w): return len(set(w)) == len(w)
 
 
-def nothing_in_common_with(diff_word): return lambda w: all([
-    c not in diff_word for c in w])
+def nothing_in_common_with(diff_word): 
+    return lambda w: all([c not in diff_word for c in w])
+
+
+# Applies a list of filter functions to a list of words.
+def filter_word_list(filters, word_list):
+    for f in filters:
+        word_list = list(filter(f, word_list))
+
+    return word_list
 
 
 # Loads word list from specified filename.
@@ -48,7 +55,13 @@ def score_word_list(word_list, letter_counts, filters):
             score += letter_counts[char][index]
         return score
 
-    return {word: score_word(word) for word in word_list if all([f(word) for f in filters])}
+    if filters:
+        if callable(filters): filters = [filters]  # Handle a single passed filter function.
+        scores_dict = {word: score_word(word) for word in word_list if all([f(word) for f in filters])}
+    else:
+        scores_dict = {word: score_word(word) for word in word_list}
+
+    return scores_dict
 
 
 # Prints top ten scores.
@@ -65,6 +78,7 @@ def get_best_words(scores_dict):
             print(f"#{i+1}", scored_words[i])
 
     return scored_words[0:num_words]
+
 
 # Returns outcome (e.g. "g-y--") given a known solution and played word.
 def evaluate_played_word(played_word, solution_word):
@@ -94,7 +108,7 @@ def evaluate_played_word(played_word, solution_word):
 
 
 # Plays through game of Wordle, scoring words with letter_counts dict.
-def play_game(letter_counts):
+def play_game(letter_counts, strategy={}):
     # Play up to 6 rounds.
     num_rounds = 6
 
@@ -103,14 +117,16 @@ def play_game(letter_counts):
     played_words = []
 
     filters = []
-
+    
     game_won = None  # state = None if game still in progress.
     for round in range(1, num_rounds+1):
         print(f"\n{'-'*10}[{round}/{num_rounds}]{'-'*10}")
 
-        # Suggest best words for this round.
-        scores_dict = score_word_list(remaining_words, letter_counts, filters)
-        remaining_words = scores_dict.keys()
+        # Suggest best words for this round, applying strategy if present.
+        strategy_filters = {}  # Filters for this round only, does not edit remaining words list.
+        if round in strategy.keys():
+            strategy_filters = strategy[round]
+        scores_dict = score_word_list(remaining_words, letter_counts, strategy_filters)
         best_words = get_best_words(scores_dict)
 
         # Win / Lose conditions.
@@ -175,6 +191,7 @@ def play_game(letter_counts):
                                     return w[i] != p[i]
 
                 filters.append(new_filter)
+            remaining_words = filter_word_list(filters, remaining_words)
 
         else:  # Game over!
             if game_won:

@@ -6,7 +6,9 @@ def solve_wordle():
     sol_words = load_word_list(SOLUTION_FILE)
     letter_counts = count_letter_frequencies(sol_words)
 
-    play_game(letter_counts)
+    strategy = {1: has_no_doubles}
+
+    play_game(letter_counts, strategy)
 
 
 if __name__ == "__main__":
