@@ -77,6 +77,8 @@ def get_best_words(scores_dict):
         for i in range(num_words):
             print(f"#{i+1}", scored_words[i])
 
+    print()
+
     return scored_words[0:num_words]
 
 
@@ -108,7 +110,8 @@ def evaluate_played_word(played_word, solution_word):
 
 
 # Plays through game of Wordle, scoring words with letter_counts dict.
-def play_game(letter_counts, strategy={}):
+# If solution word is known, can automatically evaluate words.
+def play_game(letter_counts, strategy={}, solution_word=None):
     # Play up to 6 rounds.
     num_rounds = 6
 
@@ -130,8 +133,11 @@ def play_game(letter_counts, strategy={}):
         best_words = get_best_words(scores_dict)
 
         # Win / Lose conditions.
-        if len(best_words) == 1: game_won = True
-        elif len(best_words) == 0: game_won = False
+        if len(best_words) == 1: 
+            game_won = True
+            played_words.append(best_words[0])
+        elif len(best_words) == 0:
+            game_won = False
 
         if game_won is None:  # Game still in progress!
 
@@ -142,22 +148,27 @@ def play_game(letter_counts, strategy={}):
                 w.isnumeric() and int(w) <= len(best_words))
             while not isvalid(played_word):
                 played_word = input("What word was played?\t")
-                played_words.append(played_word)
 
             # Handle numerical selection.
             if played_word.isnumeric():
                 index = int(played_word) - 1
                 played_word = best_words[index]
+                print(f"({played_word})")
+            
+            played_words.append(played_word)
 
             # Retrieve outcome of played word.
             outcome = ''
+            if solution_word: 
+                outcome = evaluate_played_word(played_word, solution_word)
+                print("Result:\t" + outcome)
+            else:
+                def isvalid(w): return len(w) == 5 and all(
+                    [c.lower() in "gy-" for c in w])
 
-            def isvalid(w): return len(w) == 5 and all(
-                [c.lower() in "gy-" for c in w])
-
-            while not isvalid(outcome):
-                outcome = input(
-                    "What was the outcome? ('g' = green, 'y' = yellow, '-' = none)\t")
+                while not isvalid(outcome):
+                    outcome = input(
+                        "What was the outcome? ('g' = green, 'y' = yellow, '-' = none)\t")
 
             # Parse outcome and create filters for next round.
             filters = []
@@ -191,6 +202,7 @@ def play_game(letter_counts, strategy={}):
                                     return w[i] != p[i]
 
                 filters.append(new_filter)
+
             remaining_words = filter_word_list(filters, remaining_words)
 
         else:  # Game over!
@@ -198,4 +210,4 @@ def play_game(letter_counts, strategy={}):
                 print("You've wordled it!")
             else:
                 print("You've completely wordled it up. Try again.")
-            return (game_won, played_words)
+            return (round, played_words, game_won)
