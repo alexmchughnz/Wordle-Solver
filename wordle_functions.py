@@ -49,11 +49,18 @@ def count_letter_frequencies(word_list):
 # Returns dictionary of scores for all words in list which meet conditions.
 def score_word_list(word_list, letter_counts, filters):
 
-    def score_word(word):
-        score = 0
-        for (index, char) in enumerate(word):
-            score += letter_counts[char][index]
-        return score
+    sample = next(iter(letter_counts.values()))
+    if type(sample) == list:
+        # Using list of positional scores for each letter.
+        def score_word(word):
+            score = 0
+            for (index, char) in enumerate(word):
+                score += letter_counts[char][index]
+            return score
+    else:
+        # Using total score for each letter.
+        def score_word(word):
+            return sum([letter_counts[char] for char in word])
 
     if filters:
         if callable(filters): filters = [filters]  # Handle a single passed filter function.

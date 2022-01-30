@@ -5,7 +5,11 @@ from disable_printing import *
 def test_wordle_strategies():
     # Count word frequencies.
     sol_words = load_word_list(SOLUTION_FILE)
-    letter_counts = count_letter_frequencies(sol_words)
+
+    positional_counts = count_letter_frequencies(sol_words)
+    total_counts = {letter: sum(counts) for (letter, counts) in positional_counts.items()}
+
+    letter_counts = positional_counts
 
     top_word = sorted(letter_counts, key=letter_counts.get, reverse=True)[0]
 
