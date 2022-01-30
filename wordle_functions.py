@@ -151,29 +151,41 @@ def get_filters_from_outcome(played_word, outcome):
 
 
 
-# Plays through game of Wordle, scoring words with letter_counts dict.
+# Plays through 6-round game of Wordle, scoring words with letter_counts dict.
 # If solution word is known, can automatically evaluate words.
-def play_game(letter_counts, strategy={}, solution_word=None):
-    # Play up to 6 rounds.
+def play_game(letter_counts, strategy_dict={}, solution_word=None):
+    # Useful definitions.
     num_rounds = 6
+    solution_list = load_word_list(SOLUTION_FILE)
+    dictionary_list = load_word_list(DICTIONARY_FILE)
+    all_words = solution_list + dictionary_list
 
-    all_words = load_word_list(SOLUTION_FILE) + load_word_list(DICTIONARY_FILE)
+    # Game state variables.
     remaining_words = all_words.copy()
     played_words = []
-
-    filters = []
-    
     round = 0
     game_won = None  # state = None if game still in progress.
+
+    # Main game loop.
     while game_won is None:
         round += 1
         print(f"\n{'-'*10}[{round}/{num_rounds}]{'-'*10}")
 
         # Suggest best words for this round, applying strategy if present.
-        strategy_filters = {}  # Filters for this round only, does not edit remaining words list.
-        if round in strategy.keys():
-            strategy_filters = strategy[round]
-        scores_dict = score_word_list(remaining_words, letter_counts, strategy_filters)
+        search_filters = {}  # Filters for this round only, does not edit remaining words list.
+        word_list = remaining_words
+        if round in strategy_dict.keys():
+            strategy = strategy_dict[round]
+
+            if 'filters' in strategy.keys():
+                search_filters = strategy['filters']
+            if 'words' in strategy.keys():
+                match strategy_dict[round]['words']:
+                    case 'all': word_list = all_words
+                    case 'solution': word_list = solution_list
+                    case 'dictionary': word_list = dictionary_list
+
+        scores_dict = score_word_list(word_list, letter_counts, search_filters)
         best_words = get_best_words(scores_dict)
 
         # Win / Lose conditions.
@@ -189,9 +201,9 @@ def play_game(letter_counts, strategy={}, solution_word=None):
 
             # Retrieve played word (typed, or number from previous best words list).
             played_word = ''
-            if 'choose_word' in strategy:
+            if 'choose_word' in strategy_dict:
                 # Pre-defined pick.
-                played_word = str(strategy['choose_word'])
+                played_word = str(strategy_dict['choose_word'])
             else:
                 # User input pick.
                 def isvalid(w): return (w in all_words) or (
