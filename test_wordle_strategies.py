@@ -7,10 +7,15 @@ def test_wordle_strategies():
     sol_words = load_word_list(SOLUTION_FILE)
     letter_counts = count_letter_frequencies(sol_words)
 
+    top_word = sorted(letter_counts, key=letter_counts.get, reverse=True)[0]
+
     strategies = []
     strategies.append({'choose_word': 1})
     strategies.append({'choose_word': 1,
                        1: has_no_doubles})
+    strategies.append({'choose_word': 1,
+                       1: has_no_doubles,
+                       2: nothing_in_common_with(top_word)})
           
     average_rounds = {}
     for (n, strategy) in enumerate(strategies):
