@@ -6,14 +6,21 @@ SOLUTION_FILE = "solutions.csv"
 DICTIONARY_FILE = "dictionary.csv"
 
 # Additional filters for searching.
+# Filters take a word, and a dictionary of context
+def has_no_doubles(word, context):
+    return len(set(word)) == len(word)
 
 
-def has_no_doubles(w): return len(set(w)) == len(w)
+def shares_nothing_with_previous(word, context): 
+    return all([c not in context['played_word'] for c in word])
 
+def shares_yellows_with_previous(word, context):
+    played_word = context['played_word']
+    outcome = context['outcome']
+    has_no_greens = [played_word[i] not in word for (i, c) in enumerate(outcome) if c in '-g']
+    return all(has_no_greens)
 
-def nothing_in_common_with(diff_word): 
-    return lambda w: all([c not in diff_word for c in w])
-
+    
 
 # Applies a list of filter functions to a list of words.
 def filter_word_list(filters, word_list):
@@ -47,7 +54,7 @@ def count_letter_frequencies(word_list):
 
 
 # Returns dictionary of scores for all words in list which meet conditions.
-def score_word_list(word_list, letter_counts, filters):
+def score_word_list(word_list, letter_counts, filters, context):
 
     sample = next(iter(letter_counts.values()))
     if type(sample) == list:
@@ -64,20 +71,19 @@ def score_word_list(word_list, letter_counts, filters):
 
     if filters:
         if callable(filters): filters = [filters]  # Handle a single passed filter function.
-        scores_dict = {word: score_word(word) for word in word_list if all([f(word) for f in filters])}
+        word_scores = {word: score_word(word) for word in word_list if all([f(word, context) for f in filters])}
     else:
-        scores_dict = {word: score_word(word) for word in word_list}
+        word_scores = {word: score_word(word) for word in word_list}
 
-    return scores_dict
+    return word_scores
 
 
 # Prints top ten scores.
-def get_best_words(scores_dict):
-    max_n = 10
+def get_best_words(word_scores, n=10):
     print("Most likely words:")
-    scored_words = sorted(scores_dict, key=scores_dict.get, reverse=True)
+    scored_words = sorted(word_scores, key=word_scores.get, reverse=True)
 
-    num_words = min(max_n, len(scored_words))
+    num_words = min(n, len(scored_words))
     if num_words == 0:
         print("No valid words!")
     else:
@@ -163,6 +169,7 @@ def play_game(letter_counts, strategy_dict={}, solution_word=None):
     # Game state variables.
     remaining_words = all_words.copy()
     played_words = []
+    context = {}
     round = 0
     game_won = None  # state = None if game still in progress.
 
@@ -185,8 +192,8 @@ def play_game(letter_counts, strategy_dict={}, solution_word=None):
                     case 'solution': word_list = solution_list
                     case 'dictionary': word_list = dictionary_list
 
-        scores_dict = score_word_list(word_list, letter_counts, search_filters)
-        best_words = get_best_words(scores_dict)
+        word_scores = score_word_list(word_list, letter_counts, search_filters, context)
+        best_words = get_best_words(word_scores)
 
         # Win / Lose conditions.
         if len(best_words) == 1:  # Auto-win if one valid word remains.
@@ -225,6 +232,7 @@ def play_game(letter_counts, strategy_dict={}, solution_word=None):
                 #  Win game immediately if guess is correct.
                 game_won = True
             else:
+                # Get outcome of played word.
                 outcome = ''
                 if solution_word: 
                     outcome = evaluate_played_word(played_word, solution_word)
@@ -236,9 +244,19 @@ def play_game(letter_counts, strategy_dict={}, solution_word=None):
                     while not isvalid(outcome):
                         outcome = input(
                             "What was the outcome? ('g' = green, 'y' = yellow, '-' = none)\t")
-            
-                filters = get_filters_from_outcome(played_word, outcome)
-                remaining_words = filter_word_list(filters, remaining_words)
+
+                if outcome == 'ggggg':
+                    #  Win game immediately if outcome is all correct.
+                    game_won = True
+
+                else:
+                    # Update variables for next round.
+                    filters = get_filters_from_outcome(played_word, outcome)
+                    remaining_words = filter_word_list(filters, remaining_words)
+                    context = {
+                        'played_word': played_word,
+                        'outcome': outcome
+                    }
 
         # Game completed.
         if game_won is not None: 
